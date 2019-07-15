@@ -127,6 +127,9 @@ def get_mapping_for_format(format):
     elif field_type == "text":
         field_mapping["type"] = "text"
 
+    elif field_type == "geo_point":
+        field_mapping["type"] = "geo_point"
+
     return field_name, field_mapping 
 
 def get_data_for_format(format):
@@ -191,8 +194,18 @@ def get_data_for_format(format):
             words.append(""+random.choice(text))
         return_val = " ".join(words)
 
-    return field_name, return_val
+    elif field_type == "geo_point":
+        min_lat =  -90.0 if len(split_f) < 3 else float(split_f[2])
+        max_lat =   90.0 if len(split_f) < 4 else float(split_f[3])
+        min_lon = -180.0 if len(split_f) < 5 else float(split_f[4])
+        max_lon =  180.0 if len(split_f) < 6 else float(split_f[5])
 
+        return_val = {
+            "lat": random.uniform( min_lat,  max_lat ),
+            "lon": random.uniform( min_lon,  max_lon )
+        }
+
+    return field_name, return_val
 
 def generate_count(min, max):
     if min == max:

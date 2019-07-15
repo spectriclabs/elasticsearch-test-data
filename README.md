@@ -88,6 +88,8 @@ Currently supported field types are:
 - `words:min:max` a random number of `strs`, separated by space, `min` and `max` are optional, defaulting to '2' and `10`
 - `dict:min:max` a random number of entries from the dictionary file, separated by space, `min` and `max` are optional, defaulting to '2' and `10`
 - `text:words:min:max` a random number of words seperated by space from a given list of `-` seperated words, the words are optional defaulting to `text1` `text2` and `text3`, min and max are optional, defaulting to `1` and `1`
+- `geo_point:min_lat:max_lat:min_lon:max_lon` a random geopoint between `min_lat`, `max_lat`, `min_lon`, and `max_lon`.  If `min` and `max` values are not provided the default to
+the entire world
 
 
 
