@@ -118,13 +118,7 @@ def get_mapping_for_format(format):
         field_mapping["type"] = "date"
         field_mapping["format"] = "strict_date_time"
 
-    elif field_type == "words":
-        field_mapping["type"] = "text"
-
-    elif field_type == "dict":
-        field_mapping["type"] = "text"
-
-    elif field_type == "text":
+    elif field_type in ("words", "dict", "text"):
         field_mapping["type"] = "text"
 
     elif field_type == "geo_point":
