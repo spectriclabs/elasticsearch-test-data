@@ -19,7 +19,10 @@ id_counter = 0
 upload_data_count = 0
 _dict_data = None
 
-
+byte_range = (-128, 127)
+short_range = (-32768, 32767)
+integer_range = (-2**31, 2**31-1)
+long_range = (-2**63, 2**63-1)
 
 def delete_index(idx_name):
     try:
@@ -30,14 +33,16 @@ def delete_index(idx_name):
     except tornado.httpclient.HTTPError:
         pass
 
-
-def create_index(idx_name):
+def create_index(idx_name, format):
     schema = {
         "settings": {
             "number_of_shards":   tornado.options.options.num_of_shards,
             "number_of_replicas": tornado.options.options.num_of_replicas
         }
     }
+
+    if not tornado.options.options.dynamic_index:
+        schema["mappings"] = generate_mapping(format)
 
     body = json.dumps(schema)
     url = "%s/%s" % (tornado.options.options.es_url, idx_name)
@@ -70,6 +75,59 @@ def upload_batch(upload_data_txt):
     took = int(result['took'])
     logging.info("Upload: %s - upload took: %5dms, total docs uploaded: %7d" % (res_txt, took, upload_data_count))
 
+def get_mapping_for_format(format):
+    split_f = format.split(":")
+    if not split_f:
+        return None, None
+
+    field_name = split_f[0]
+    field_type = split_f[1]
+
+    field_mapping = {}
+    if field_type == "bool":
+        field_mapping["type"] = "boolean"
+
+    elif field_type == "str":
+        field_mapping["type"] = "keyword"
+
+    elif field_type == "int":
+        min = 0 if len(split_f) < 3 else int(split_f[2])
+        max = min + 100000 if len(split_f) < 4 else int(split_f[3])
+
+        if ((byte_range[0] <= min <= byte_range[1]) and
+            (byte_range[0] <= max <= byte_range[1])):
+            field_mapping["type"] = "byte"
+        elif ((short_range[0] <= min <= short_range[1]) and
+              (short_range[0] <= max <= short_range[1])):
+            field_mapping["type"] = "short"
+        elif ((integer_range[0] <= min <= integer_range[1]) and
+              (integer_range[0] <= max <= integer_range[1])):
+            field_mapping["type"] = "integer"
+        elif ((long_range[0] <= min <= long_range[1]) and
+              (long_range[0] <= max <= long_range[1])):
+            field_mapping["type"] = "long"
+
+    elif field_type == "ipv4":
+        field_mapping["type"] = "ip"
+
+    elif field_type == "ts":
+        field_mapping["type"] = "date"
+        field_mapping["format"] = "epoch_millis"
+
+    elif field_type == "tstxt":
+        field_mapping["type"] = "date"
+        field_mapping["format"] = "strict_date_time"
+
+    elif field_type == "words":
+        field_mapping["type"] = "text"
+
+    elif field_type == "dict":
+        field_mapping["type"] = "text"
+
+    elif field_type == "text":
+        field_mapping["type"] = "text"
+
+    return field_name, field_mapping 
 
 def get_data_for_format(format):
     split_f = format.split(":")
@@ -166,6 +224,13 @@ def generate_random_doc(format):
 
     return res
 
+def generate_mapping(format):
+    properties = {}
+    for f in format:
+        f_key, f_map = get_mapping_for_format(f)
+        if (f_key != None) and (f_map != None):
+            properties[f_key] = f_map
+    return {"properties": properties }
 
 def set_index_refresh(val):
 
@@ -198,7 +263,7 @@ def generate_test_data():
     if tornado.options.options.force_init_index:
         delete_index(tornado.options.options.index_name)
 
-    create_index(tornado.options.options.index_name)
+    create_index(tornado.options.options.index_name, format)
 
     # todo: query what refresh is set to, then restore later
     if tornado.options.options.set_refresh:
@@ -268,6 +333,7 @@ if __name__ == '__main__':
     tornado.options.define("format", type=str, default='name:str,age:int,last_updated:ts', help="message format")
     tornado.options.define("num_of_replicas", type=int, default=0, help="Number of replicas for ES index")
     tornado.options.define("force_init_index", type=bool, default=False, help="Force deleting and re-initializing the Elasticsearch index")
+    tornado.options.define("dynamic_index", type=bool, default=False, help="Use dynamic index instead of a strict mapping")
     tornado.options.define("set_refresh", type=bool, default=False, help="Set refresh rate to -1 before starting the upload")
     tornado.options.define("out_file", type=str, default=False, help="If set, write test data to out_file as well.")
     tornado.options.define("id_type", type=str, default=None, help="Type of 'id' to use for the docs, valid settings are int and uuid4, None is default")
