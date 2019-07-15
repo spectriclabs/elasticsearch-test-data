@@ -65,6 +65,8 @@ to an Elasticsearch cluster at `http://localhost:9200` to an index called `test_
 - `--batch_size=###` we use bulk upload to send the docs to ES, this option controls how many we send at a time
 - `--force_init_index=False` if `True` it will delete and re-create the index
 - `--dict_file=filename.dic` if provided the `dict` data type will use words from the dictionary file, format is one word per line. The entire file is loaded at start-up so be careful with (very) large files. You can download wordlists e.g.. from [here](http://ohardt.us/word-lists). 
+- `--cities_file=filename.cvs` if provided the cities will be loaded from the CSV file.  Default is `worldcities.csv` which can be downloaded from [here](https://simplemaps.com/data/world-cities).
+- `--num_of_cities` if provided, sets the number of cities to use when generating city points.  Default is to use all cities loaded via `--cities_file`.
 
 #### What about the document format? 
 
@@ -90,8 +92,7 @@ Currently supported field types are:
 - `text:words:min:max` a random number of words seperated by space from a given list of `-` seperated words, the words are optional defaulting to `text1` `text2` and `text3`, min and max are optional, defaulting to `1` and `1`
 - `geo_point:min_lat:max_lat:min_lon:max_lon` a random geopoint between `min_lat`, `max_lat`, `min_lon`, and `max_lon`.  If `min` and `max` values are not provided the default to
 the entire world
-
-
+- `cities:min_rad:max_rad` return a random geopoint within `min_rad` and `max_rad` meters from a chosen random city loaded via `--cities_file`.
 
 ## todo
 - document the remaining cmd line options

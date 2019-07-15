@@ -7,6 +7,9 @@ import random
 import string
 import uuid
 import datetime
+import csv
+import os
+import math
 
 import tornado.gen
 import tornado.httpclient
@@ -18,6 +21,7 @@ headers = tornado.httputil.HTTPHeaders({"content-type": "application/json"})
 id_counter = 0
 upload_data_count = 0
 _dict_data = None
+_cities_data = None
 
 byte_range = (-128, 127)
 short_range = (-32768, 32767)
@@ -121,7 +125,7 @@ def get_mapping_for_format(format):
     elif field_type in ("words", "dict", "text"):
         field_mapping["type"] = "text"
 
-    elif field_type == "geo_point":
+    elif field_type in ("geo_point", "cities"):
         field_mapping["type"] = "geo_point"
 
     return field_name, field_mapping 
@@ -199,6 +203,25 @@ def get_data_for_format(format):
             "lon": random.uniform( min_lon,  max_lon )
         }
 
+    elif field_type == "cities":
+        global _cities_data
+        if not _cities_data:
+            logging.error("cannot generate cities data without cities file, see README.md")
+            exit(1)
+        min_radius_meters = 0 if len(split_f) < 3 else float(split_f[2])
+        max_radius_meters = (min_radius_meters + 10000) if len(split_f) < 4 else float(split_f[3])
+
+        chosen_city = random.choice(_cities_data)
+        point = generate_random_point(
+            float(chosen_city["lat"]), float(chosen_city["lng"]),
+            min_radius_meters, max_radius_meters
+        )
+
+        return_val = {
+            "lat": point[0],
+            "lon": point[1]
+        }
+
     return field_name, return_val
 
 def generate_count(min, max):
@@ -231,6 +254,31 @@ def generate_random_doc(format):
 
     return res
 
+def generate_random_point(lat_dd, lon_dd, min_radius_meters, max_radius_meters):
+    """
+    From https://jordinl.com/posts/2019-02-15-how-to-generate-random-geocoordinates-within-given-radius
+    """
+    lat_rad = lat_dd * ( math.pi / 180.0)
+    lon_rad = lon_dd * ( math.pi / 180.0)
+
+    earth_radius = 6371000.0
+
+    u = (max_radius_meters ** 2) - (min_radius_meters ** 2)
+    distance = math.sqrt((random.random() * u) + (min_radius_meters ** 2))
+    distance_over_er = (distance / earth_radius)
+
+    delta_lat = math.cos(random.random() * math.pi) * distance_over_er
+    sign = random.choice((-1, 1))
+
+    v = math.cos(distance_over_er) - math.cos(delta_lat)
+    x = math.cos(lat_rad) * math.cos(delta_lat + lat_rad)
+    delta_lon = sign * math.acos(( v / x ) + 1)
+
+    ans_lat_dd = (lat_rad + delta_lat) * (180.0 / math.pi)
+    ans_lon_dd = (lon_rad + delta_lon) * (180.0 / math.pi)
+
+    return ans_lat_dd, ans_lon_dd
+
 def generate_mapping(format):
     properties = {}
     for f in format:
@@ -252,6 +300,24 @@ def set_index_refresh(val):
     except Exception as ex:
         logging.exception(ex)
 
+def load_cites(cities_file, num_of_cities):
+    global _cities_data
+    with open(tornado.options.options.cities_file, 'r') as f:
+        _cities_data = list( csv.DictReader(f) )
+
+    required_columns = ("city_ascii", "iso2", "lat", "lng")
+    missing_columns = []
+    for required_column in required_columns:
+        if required_column not in _cities_data[0]:
+            missing_columns.append(required_column)
+        if missing_columns:
+            logging.error("Cities data file missing columns '%s'", ",".join(missing_columns))
+            exit(1)
+
+    logging.info("Loaded %d cities from %s" % (len(_cities_data), tornado.options.options.dict_file))
+    if num_of_cities:
+        _cities_data = random.sample(_cities_data, num_of_cities)
+        logging.info("Using %d cities from %s" % (len(_cities_data), tornado.options.options.dict_file))
 
 @tornado.gen.coroutine
 def generate_test_data():
@@ -287,6 +353,8 @@ def generate_test_data():
             _dict_data = f.readlines()
         logging.info("Loaded %d words from the %s" % (len(_dict_data), tornado.options.options.dict_file))
 
+    if tornado.options.options.cities_file and os.path.exists(tornado.options.options.cities_file):
+        load_cites(tornado.options.options.cities_file, tornado.options.options.num_of_cities)
 
     ts_start = int(time.time())
     upload_data_txt = ""
@@ -345,6 +413,8 @@ if __name__ == '__main__':
     tornado.options.define("out_file", type=str, default=False, help="If set, write test data to out_file as well.")
     tornado.options.define("id_type", type=str, default=None, help="Type of 'id' to use for the docs, valid settings are int and uuid4, None is default")
     tornado.options.define("dict_file", type=str, default=None, help="Name of dictionary file to use")
+    tornado.options.define("cities_file", type=str, default="worldcities.csv", help="Name of dictionary file to use")
+    tornado.options.define("num_of_cities", type=int, default=None, help="Number of cities to use when generating city geopoints, None is default")
     tornado.options.define("username", type=str, default=None, help="Username for elasticsearch")
     tornado.options.define("password", type=str, default=None, help="Password for elasticsearch")
     tornado.options.define("validate_cert", type=bool, default=True, help="SSL validate_cert for requests. Use false for self-signed certificates.")
