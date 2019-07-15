@@ -187,6 +187,11 @@ def generate_test_data():
 
     global upload_data_count
 
+    format = tornado.options.options.format.split(',')
+    if not format:
+        logging.error('invalid format')
+        exit(1)
+
     if tornado.options.options.force_init_index:
         delete_index(tornado.options.options.index_name)
 
@@ -207,10 +212,6 @@ def generate_test_data():
             _dict_data = f.readlines()
         logging.info("Loaded %d words from the %s" % (len(_dict_data), tornado.options.options.dict_file))
 
-    format = tornado.options.options.format.split(',')
-    if not format:
-        logging.error('invalid format')
-        exit(1)
 
     ts_start = int(time.time())
     upload_data_txt = ""
