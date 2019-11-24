@@ -128,6 +128,9 @@ def get_mapping_for_format(format):
     elif field_type in ("geo_point", "cities"):
         field_mapping["type"] = "geo_point"
 
+    else:
+        field_mapping["type"] = field_type
+
     return field_name, field_mapping 
 
 def get_data_for_format(format):
@@ -153,17 +156,31 @@ def get_data_for_format(format):
         min = 0 if len(split_f) < 3 else int(split_f[2])
         max = min + 100000 if len(split_f) < 4 else int(split_f[3])
         return_val = generate_count(min, max)
+
+    elif field_type in ("float", "double", "half_float"):
+        min = 0.0 if len(split_f) < 3 else int(split_f[2])
+        max = min + 100000.0 if len(split_f) < 4 else int(split_f[3])
+        return_val = generate_float(min, max)
     
     elif field_type == "ipv4":
         return_val = "{0}.{1}.{2}.{3}".format(generate_count(0, 245),generate_count(0, 245),generate_count(0, 245),generate_count(0, 245))
 
-    elif field_type in ["ts", "tstxt"]:
+    elif field_type == "ts":
         now = int(time.time())
         per_day = 24 * 60 * 60
         min = now - 30 * per_day if len(split_f) < 3 else int(split_f[2])
         max = now + 30 * per_day if len(split_f) < 4 else int(split_f[3])
         ts = generate_count(min, max)
-        return_val = int(ts * 1000) if field_type == "ts" else datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%dT%H:%M:%S.000-0000")
+        return_val = int(ts * 1000)
+
+    elif field_type == "tstxt":
+        now = int(time.time())
+        per_day = 24 * 60 * 60
+        min = now - 30 * per_day if len(split_f) < 3 else datetime.datetime.timestamp(datetime.datetime.strptime(split_f[2], "%Y-%m-%dT%H-%M-%S"))
+        max = now + 30 * per_day if len(split_f) < 4 else datetime.datetime.timestamp(datetime.datetime.strptime(split_f[3], "%Y-%m-%dT%H-%M-%S"))
+        ts = generate_count(min, max)
+        return_val = datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%dT%H:%M:%S.000-0000")
+
 
     elif field_type == "words":
         min = 2 if len(split_f) < 3 else int(split_f[2])
@@ -223,6 +240,14 @@ def get_data_for_format(format):
         }
 
     return field_name, return_val
+
+def generate_float(min, max):
+    if min == max:
+        return max
+    elif min > max:
+        return random.uniform(max, min);
+    else:
+        return random.uniform(min, max);
 
 def generate_count(min, max):
     if min == max:
