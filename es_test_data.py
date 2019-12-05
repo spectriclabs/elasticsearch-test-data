@@ -114,7 +114,7 @@ def get_mapping_for_format(format):
     elif field_type == "ipv4":
         field_mapping["type"] = "ip"
 
-    elif field_type == "ts":
+    elif field_type in ("ts", "ts_series"):
         field_mapping["type"] = "date"
         field_mapping["format"] = "epoch_millis"
 
@@ -127,13 +127,16 @@ def get_mapping_for_format(format):
 
     elif field_type in ("geo_point", "cities"):
         field_mapping["type"] = "geo_point"
+    
+    elif field_type in ("ellipse","ellipsecities","path"):
+        field_mapping["type"] = "geo_shape"
 
     else:
         field_mapping["type"] = field_type
 
     return field_name, field_mapping 
 
-def get_data_for_format(format):
+def get_data_for_format(format,doc_num):
     split_f = format.split(":")
     if not split_f:
         return None, None
@@ -172,6 +175,12 @@ def get_data_for_format(format):
         max = now + 30 * per_day if len(split_f) < 4 else int(split_f[3])
         ts = generate_count(min, max)
         return_val = int(ts * 1000)
+
+    elif field_type == "ts_series":
+        now = int(time.time())
+        delta = 60000 if len(split_f) < 3 else int(split_f[2])
+        time_delta =  delta*doc_num
+        return_val = int((now* 1000)+time_delta)
 
     elif field_type == "tstxt":
         now = int(time.time())
@@ -238,6 +247,83 @@ def get_data_for_format(format):
             "lat": point[0],
             "lon": point[1]
         }
+    elif field_type == "ellipse":
+
+        ellipse_maj_mean = 0.2 if len(split_f) < 3 else float(split_f[2])
+        ellipse_min_mean = 0.1 if len(split_f) < 4 else float(split_f[3])
+        ellipse_maj_std  = .05 if len(split_f) < 5 else float(split_f[4])
+        ellipse_min_std  = .05 if len(split_f) < 6 else float(split_f[5])
+        ellipse_num_points = 30 if len(split_f) < 7 else int(split_f[6])
+
+        # Random Center Point
+        point1 = random.uniform( -180,  180 )
+        point2 = random.uniform( -90,  90 )
+        
+        points = generate_random_ellipse(point1,point2,ellipse_maj_mean,ellipse_min_mean,ellipse_maj_std,ellipse_min_std,ellipse_num_points)
+        return_val = {
+                "type" : "polygon",
+                "coordinates": [points]
+            }
+    elif field_type == "ellipsecities":
+
+        ellipse_maj_mean = 0.2 if len(split_f) < 3 else float(split_f[2])
+        ellipse_min_mean = 0.1 if len(split_f) < 4 else float(split_f[3])
+        ellipse_maj_std  = .05 if len(split_f) < 5 else float(split_f[4])
+        ellipse_min_std  = .05 if len(split_f) < 6 else float(split_f[5])
+        ellipse_num_points = 30 if len(split_f) < 7 else int(split_f[6])
+
+        global _cities_data
+        if not _cities_data:
+            logging.error("cannot generate cities data without cities file, see README.md")
+            exit(1)
+        min_radius_meters = 0 if len(split_f) < 8 else float(split_f[7])
+        max_radius_meters = (min_radius_meters + 10000) if len(split_f) < 9 else float(split_f[8])
+
+        chosen_city = random.choice(_cities_data)
+        point = generate_random_point(
+            float(chosen_city["lat"]), float(chosen_city["lng"]),
+            min_radius_meters, max_radius_meters
+        )
+        point1 = point[1]
+        point2 = point[0]
+        
+        points = generate_random_ellipse(point1,point2,ellipse_maj_mean,ellipse_min_mean,ellipse_maj_std,ellipse_min_std,ellipse_num_points)
+        return_val = {
+                "type" : "polygon",
+                "coordinates": [points]
+            }
+        
+        # return_val = {
+        #         "type" : "geometrycollection", 
+        #         "geometries": [
+        #             {
+        #             "type" : "point",
+        #             "coordinates": [point[1],point[0]] 
+        #             },
+        #             {
+        #             "type" : "polygon",
+        #             "coordinates": [points] 
+        #             }
+        #         ] 
+        # }        
+
+    elif field_type == "path":
+            
+        # Random Center Point
+        start_lon = random.uniform( -180,  180 )
+        start_lat = random.uniform( -90,  90 )
+
+        length = 20 if len(split_f) < 3 else int(split_f[2])
+        heading_std = 5.0 if len(split_f) < 4 else float(split_f[3])
+        speed_start = 1000.0 if len(split_f) < 5 else float(split_f[4])
+        speed_std = 50.0 if len(split_f) < 6 else float(split_f[5])
+        
+        points = generate_random_path(start_lon,start_lat,length,heading_std,speed_start,speed_std)
+
+        return_val = {
+            "type" : "linestring",
+            "coordinates": points
+        }
 
     return field_name, return_val
 
@@ -258,13 +344,13 @@ def generate_count(min, max):
         return random.randrange(min, max);
 
 
-def generate_random_doc(format):
+def generate_random_doc(format,doc_num):
     global id_counter
 
     res = {}
 
     for f in format:
-        f_key, f_val = get_data_for_format(f)
+        f_key, f_val = get_data_for_format(f,doc_num)
         if f_key:
             res[f_key] = f_val
 
@@ -303,6 +389,55 @@ def generate_random_point(lat_dd, lon_dd, min_radius_meters, max_radius_meters):
     ans_lon_dd = (lon_rad + delta_lon) * (180.0 / math.pi)
 
     return ans_lat_dd, ans_lon_dd
+
+def generate_random_ellipse(x,y,ellipse_maj_mean,ellipse_min_mean,ellipse_maj_std,ellipse_min_std,ellipse_num_points):
+
+    # Rotation of ellipse is uniform from 0 to 180 degrees
+    rotation =  random.uniform(0,180)
+    rotation = rotation / 180 * math.pi;
+
+    # Major and Minor Ellipse Lengths are created from a normal distribution based on mean, and std specified
+    a = random.gauss(ellipse_maj_mean,ellipse_maj_std)
+    b = random.gauss(ellipse_min_mean,ellipse_min_std)
+
+    points = []
+    # Loop over number of points, and compute ellipse points
+    for i in range(ellipse_num_points): 
+        theta = math.pi*2/ellipse_num_points*i + rotation
+        r = a*b/math.sqrt(a*a*math.sin(theta)*math.sin(theta) + b*b*math.cos(theta)*math.cos(theta))
+        x1 = x+math.cos(theta-rotation) * r
+        y1 = y+math.sin(theta-rotation) * r
+        if x1<-180: x1=-180
+        if x1>180: x1=180
+        if y1<-90: y1=-90
+        if y1>90: y1=90
+        points.append([x1,y1])
+    points.append(points[0])
+    return points
+
+def generate_random_path(x,y,length,heading_std,speed_start,speed_std):
+
+    earth_circ = 6371000.0 * 2 * math.pi
+
+    points = []
+    points.append([x,y])
+
+    heading = random.uniform(0,360)
+    speed = speed_start
+    
+    # Make 1 point every 60 seconds for a total of length points
+    for i in range(length):
+        heading = heading + random.gauss(0,heading_std)
+        heading = heading % 360
+        x1 = points[i][0]+ math.cos(math.radians(heading))*speed/earth_circ*360*60
+        y1 = points[i][1]+ math.sin(math.radians(heading))*speed/earth_circ*360*60 
+        if x1<-180: x1=-180
+        if x1>180: x1=180
+        if y1<-90: y1=-90
+        if y1>90: y1=90
+        points.append([x1,y1])
+        speed = speed + random.gauss(0,speed_std)
+    return points
 
 def generate_mapping(format):
     properties = {}
@@ -389,7 +524,7 @@ def generate_test_data():
                                                                   tornado.options.options.batch_size))
     for num in range(0, tornado.options.options.count):
 
-        item = generate_random_doc(format)
+        item = generate_random_doc(format,num)
 
         if out_file:
             out_file.write("%s\n" % json.dumps(item))

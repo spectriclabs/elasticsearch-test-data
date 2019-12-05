@@ -92,7 +92,10 @@ Currently supported field types are:
 - `text:words:min:max` a random number of words seperated by space from a given list of `-` seperated words, the words are optional defaulting to `text1` `text2` and `text3`, min and max are optional, defaulting to `1` and `1`
 - `geo_point:min_lat:max_lat:min_lon:max_lon` a random geopoint between `min_lat`, `max_lat`, `min_lon`, and `max_lon`.  If `min` and `max` values are not provided the default to
 the entire world
+- `ellipse:major_mean:minor_mean:major_std:minor:std:num_points` a random ellipse of random size and tilt based at a random location based on mean and standard deviation provided. Ellipse is drawn as a polygon with `num_points` verticies 
 - `cities:min_rad:max_rad` return a random geopoint within `min_rad` and `max_rad` meters from a chosen random city loaded via `--cities_file`.
+- `ellipse_cities:major_mean:minor_mean:major_std:minor:std:num_points:min_rad:max_rad` a random ellipse of random size and tilt based near a random city based on mean and standard deviation provided. Ellipse is drawn as a polygon with `num_points` verticies 
+- `path:num_points:heading_std:speed_start:speed:std` creates a path of num_points long that starts at a random points on a random heading. It changes heading based on a normal distribution with heading_std as the standard deviation. It starts at speed_start and changes based on a normal distribution with speed_std as the standard deviation. 
 
 ## todo
 - document the remaining cmd line options
