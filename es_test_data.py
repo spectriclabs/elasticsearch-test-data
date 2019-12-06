@@ -276,14 +276,11 @@ def get_data_for_format(format,doc_num):
         if not _cities_data:
             logging.error("cannot generate cities data without cities file, see README.md")
             exit(1)
-        min_radius_meters = 0 if len(split_f) < 8 else float(split_f[7])
-        max_radius_meters = (min_radius_meters + 10000) if len(split_f) < 9 else float(split_f[8])
+        sigma_degrees = 0.01 if len(split_f) < 8 else float(split_f[7])
 
         chosen_city = random.choice(_cities_data)
-        point = generate_random_point(
-            float(chosen_city["lat"]), float(chosen_city["lng"]),
-            min_radius_meters, max_radius_meters
-        )
+        point = generate_random_point_normal(
+            float(chosen_city["lat"]), float(chosen_city["lng"]),sigma_degrees)
         point1 = point[1]
         point2 = point[0]
         
@@ -388,6 +385,18 @@ def generate_random_point(lat_dd, lon_dd, min_radius_meters, max_radius_meters):
     ans_lat_dd = (lat_rad + delta_lat) * (180.0 / math.pi)
     ans_lon_dd = (lon_rad + delta_lon) * (180.0 / math.pi)
 
+    return ans_lat_dd, ans_lon_dd
+
+def generate_random_point_normal(lat_dd, lon_dd, sigma_degrees):
+
+    ans_lat_dd = lat_dd+random.gauss(0,sigma_degrees)/2
+    ans_lon_dd = lon_dd+random.gauss(0,sigma_degrees)
+    
+    if lon_dd<-180: lon_dd=-180
+    if lon_dd>180: lon_dd=180
+    if ans_lat_dd<-90: ans_lat_dd=-90
+    if ans_lat_dd>90: ans_lat_dd=90
+    
     return ans_lat_dd, ans_lon_dd
 
 def generate_random_ellipse(x,y,ellipse_maj_mean,ellipse_min_mean,ellipse_maj_std,ellipse_min_std,ellipse_num_points):

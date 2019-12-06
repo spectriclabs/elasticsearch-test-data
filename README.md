@@ -95,7 +95,7 @@ Currently supported field types are:
 the entire world
 - `ellipse:major_mean:minor_mean:major_std:minor:std:num_points` a random ellipse of random size and tilt based at a random location based on mean and standard deviation provided. Ellipse is drawn as a polygon with `num_points` verticies 
 - `cities:min_rad:max_rad` return a random geopoint within `min_rad` and `max_rad` meters from a chosen random city loaded via `--cities_file`.
-- `ellipse_cities:major_mean:minor_mean:major_std:minor:std:num_points:min_rad:max_rad` a random ellipse of random size and tilt based near a random city based on mean and standard deviation provided. Ellipse is drawn as a polygon with `num_points` verticies 
+- `ellipse_cities:major_mean:minor_mean:major_std:minor:std:num_points:sigma_degrees` a random ellipse of random size and tilt based near a random city based on mean and standard deviation provided. Ellipse is drawn as a polygon with `num_points` verticies. Centers are a normial distribution away from city center with sigma_degree std dev. 
 - `path:num_points:heading_std:speed_start:speed:std` creates a path of num_points long that starts at a random points on a random heading. It changes heading based on a normal distribution with heading_std as the standard deviation. It starts at speed_start (m/s) and changes based on a normal distribution with speed_std as the standard deviation. 
 
 ## todo
