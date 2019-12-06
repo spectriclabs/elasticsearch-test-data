@@ -171,8 +171,8 @@ def get_data_for_format(format,doc_num):
     elif field_type == "ts":
         now = int(time.time())
         per_day = 24 * 60 * 60
-        min = now - 30 * per_day if len(split_f) < 3 else int(split_f[2])
-        max = now + 30 * per_day if len(split_f) < 4 else int(split_f[3])
+        min = now - per_day * (30 if len(split_f) < 3 else int(split_f[2]))
+        max = now + per_day * (30 if len(split_f) < 4 else int(split_f[3]))
         ts = generate_count(min, max)
         return_val = int(ts * 1000)
 

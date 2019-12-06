@@ -82,7 +82,8 @@ For every document, `es_test_data.py` will generate random values for each of th
 Currently supported field types are:
 
 - `bool` returns a random true or false
-- `ts` a timestamp (in milliseconds), randomly picked between now +/- 30 days
+- `ts:min_days:max_days` a timestamp (in milliseconds), randomly picked between now - min_days and now+max_days. Defaults to +/- 30. If you wanted just days in the past you would put zero for max_days (e.g. ts:30:0)
+- `ts_series:delta` a timestamp (in milliseconds) of now, incremented delta ms each data point
 - `ipv4` returns a random ipv4
 - `tstxt` a timestamp in the "%Y-%m-%dT%H:%M:%S.000-0000" format, randomly picked between now +/- 30 days
 - `int:min:max` a random integer between `min` and `max`. If `min and `max` are not provided they default to 0 and 100000
