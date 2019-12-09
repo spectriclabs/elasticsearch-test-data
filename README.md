@@ -83,11 +83,12 @@ Currently supported field types are:
 
 - `bool` returns a random true or false
 - `ts:min_days:max_days` a timestamp (in milliseconds), randomly picked between now - min_days and now+max_days. Defaults to +/- 30. If you wanted just days in the past you would put zero for max_days (e.g. ts:30:0)
-- `ts_series:delta` a timestamp (in milliseconds) of now, incremented delta ms each data point
+- `ts_series:min_days:max_days:delta:interval` a timestamp (in milliseconds) starting between now-`min_days` and now+`max_days` incremented `delta` ms each data point. Starts over after `interval` number of points 
 - `ipv4` returns a random ipv4
 - `tstxt` a timestamp in the "%Y-%m-%dT%H:%M:%S.000-0000" format, randomly picked between now +/- 30 days
 - `int:min:max` a random integer between `min` and `max`. If `min and `max` are not provided they default to 0 and 100000
 - `str:min:max` a word ( as in, a string), made up of `min` to `max` random upper/lowercase and digit characters. If `min` and `max` are optional, defaulting to `3` and `10`
+- `str_series:min:max:interval` a word ( as in, a string), made up of `min` to `max` random upper/lowercase and digit characters. If `min` and `max` are optional, defaulting to `3` and `10`. Stay the same for `inerval` number of documents
 - `words:min:max` a random number of `strs`, separated by space, `min` and `max` are optional, defaulting to '2' and `10`
 - `dict:min:max` a random number of entries from the dictionary file, separated by space, `min` and `max` are optional, defaulting to '2' and `10`
 - `text:words:min:max` a random number of words seperated by space from a given list of `-` seperated words, the words are optional defaulting to `text1` `text2` and `text3`, min and max are optional, defaulting to `1` and `1`
@@ -95,6 +96,7 @@ Currently supported field types are:
 the entire world
 - `ellipse:major_mean:minor_mean:major_std:minor:std:num_points` a random ellipse of random size and tilt based at a random location based on mean and standard deviation provided. Ellipse is drawn as a polygon with `num_points` verticies 
 - `cities:min_rad:max_rad` return a random geopoint within `min_rad` and `max_rad` meters from a chosen random city loaded via `--cities_file`.
+- `cities_path_series:length:min_rad:max_rad:heading_std:speed_start:speed_std:interval:interval_std` Creates a series of geo_points of `length` starting at a random geopoint within `min_rad` and `max_rad` meters from a chosen random city loaded via `--cities_file`. Path starts at a random heading and varies with `heading_std` and has a starting `speed_start` (m/s) varying with `speed_std`. A new point is created every `interval` seconds but varies with `interval_std`
 - `ellipse_cities:major_mean:minor_mean:major_std:minor:std:num_points:sigma_degrees` a random ellipse of random size and tilt based near a random city based on mean and standard deviation provided. Ellipse is drawn as a polygon with `num_points` verticies. Centers are a normial distribution away from city center with sigma_degree std dev. 
 - `path:num_points:heading_std:speed_start:speed:std` creates a path of num_points long that starts at a random points on a random heading. It changes heading based on a normal distribution with heading_std as the standard deviation. It starts at speed_start (m/s) and changes based on a normal distribution with speed_std as the standard deviation. 
 

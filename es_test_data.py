@@ -22,6 +22,12 @@ id_counter = 0
 upload_data_count = 0
 _dict_data = None
 _cities_data = None
+last_geo_point = (0,0)
+last_heading = 0.0
+last_speed = 0.0
+last_interval = 0.0
+last_time = 0
+last_string =""
 
 byte_range = (-128, 127)
 short_range = (-32768, 32767)
@@ -91,7 +97,7 @@ def get_mapping_for_format(format):
     if field_type == "bool":
         field_mapping["type"] = "boolean"
 
-    elif field_type == "str":
+    elif field_type in ("str","str_series"):
         field_mapping["type"] = "keyword"
 
     elif field_type == "int":
@@ -125,7 +131,7 @@ def get_mapping_for_format(format):
     elif field_type in ("words", "dict", "text"):
         field_mapping["type"] = "text"
 
-    elif field_type in ("geo_point", "cities"):
+    elif field_type in ("geo_point", "cities","cities_path_series"):
         field_mapping["type"] = "geo_point"
     
     elif field_type in ("ellipse","ellipsecities","path"):
@@ -155,6 +161,18 @@ def get_data_for_format(format,doc_num):
         length = generate_count(min, max)
         return_val = "".join([random.choice(string.ascii_letters + string.digits) for x in range(length)])
 
+    elif field_type == "str_series":
+        min = 3 if len(split_f) < 3 else int(split_f[2])
+        max = min + 7 if len(split_f) < 4 else int(split_f[3])
+        interval = 60 if len(split_f) < 5 else int(split_f[4])
+        length = generate_count(min, max)
+        global last_string
+        if (doc_num % interval == 0):
+            return_val = "".join([random.choice(string.ascii_letters + string.digits) for x in range(length)])
+            last_string = return_val
+        else:
+            return_val = last_string
+
     elif field_type == "int":
         min = 0 if len(split_f) < 3 else int(split_f[2])
         max = min + 100000 if len(split_f) < 4 else int(split_f[3])
@@ -171,16 +189,27 @@ def get_data_for_format(format,doc_num):
     elif field_type == "ts":
         now = int(time.time())
         per_day = 24 * 60 * 60
-        min = now - per_day * (30 if len(split_f) < 3 else int(split_f[2]))
-        max = now + per_day * (30 if len(split_f) < 4 else int(split_f[3]))
-        ts = generate_count(min, max)
+        min_time = now - per_day * (30 if len(split_f) < 3 else int(split_f[2]))
+        max_time = now + per_day * (30 if len(split_f) < 4 else int(split_f[3]))
+        ts = generate_count(min_time, max_time)
         return_val = int(ts * 1000)
 
     elif field_type == "ts_series":
+        global last_time
         now = int(time.time())
-        delta = 60000 if len(split_f) < 3 else int(split_f[2])
-        time_delta =  delta*doc_num
-        return_val = int((now* 1000)+time_delta)
+        per_day = 24 * 60 * 60
+        min_time = now - per_day * (30 if len(split_f) < 3 else int(split_f[2]))
+        max_time = now + per_day * (30 if len(split_f) < 4 else int(split_f[3]))
+        delta = 60000 if len(split_f) < 5 else int(split_f[4])
+        interval = 60 if len(split_f) < 6 else int(split_f[5])
+        ts = 0
+        if (doc_num % interval ==0):
+            ts = generate_count(min_time, max_time)*1000
+        else:
+            ts = last_time
+        new_time = int(ts+delta)
+        last_time = new_time
+        return_val = new_time
 
     elif field_type == "tstxt":
         now = int(time.time())
@@ -229,24 +258,83 @@ def get_data_for_format(format,doc_num):
             "lon": random.uniform( min_lon,  max_lon )
         }
 
+
     elif field_type == "cities":
         global _cities_data
         if not _cities_data:
             logging.error("cannot generate cities data without cities file, see README.md")
             exit(1)
-        min_radius_meters = 0 if len(split_f) < 3 else float(split_f[2])
+        min_radius_meters = 0.0 if len(split_f) < 3 else float(split_f[2])
         max_radius_meters = (min_radius_meters + 10000) if len(split_f) < 4 else float(split_f[3])
 
         chosen_city = random.choice(_cities_data)
         point = generate_random_point(
-            float(chosen_city["lat"]), float(chosen_city["lng"]),
+            float(chosen_city["lng"]),float(chosen_city["lat"]),
             min_radius_meters, max_radius_meters
         )
 
         return_val = {
-            "lat": point[0],
-            "lon": point[1]
+            "lon": point[0],
+            "lat": point[1]
+            
         }
+
+    elif field_type == "cities_path_series":
+
+        path_length = 100 if len(split_f) < 3 else int(split_f[2])
+        min_radius_meters = 0.0 if len(split_f) < 4 else float(split_f[3])
+        max_radius_meters = (min_radius_meters + 10000) if len(split_f) < 5 else float(split_f[4])
+        heading_std = 5.0 if len(split_f) < 6 else float(split_f[5])
+        speed_start = 1000.0 if len(split_f) < 7 else float(split_f[6])
+        speed_std = 50.0 if len(split_f) < 8 else float(split_f[7])
+        interval_start = 60.0 if len(split_f) < 9 else float(split_f[8])
+        interval_std = 5.0 if len(split_f) < 10 else float(split_f[9])
+        point =[0,0]
+
+        global last_geo_point
+        global last_heading
+        global last_interval
+        global last_speed
+        global _cities_data
+
+        if doc_num % path_length == 0: #First Item of a new path
+            if not _cities_data:
+                logging.error("cannot generate cities data without cities file, see README.md")
+                exit(1)
+
+            min_radius_meters = 0 if len(split_f) < 4 else float(split_f[3])
+            max_radius_meters = (min_radius_meters + 10000) if len(split_f) < 5 else float(split_f[4])
+
+            chosen_city = random.choice(_cities_data)
+            point = generate_random_point(
+                float(chosen_city["lng"]),float(chosen_city["lat"]),
+                min_radius_meters, max_radius_meters
+            )
+
+            last_speed = speed_start
+            last_heading = random.uniform(0,360)
+            last_interval = interval_start
+            last_geo_point = point
+
+        else:
+            distance = last_speed *last_interval 
+            point = generate_next_geo_point(last_geo_point,last_heading,distance)
+            last_speed = last_speed + random.gauss(0,speed_std)
+            last_heading = last_heading + random.gauss(0,heading_std)
+            last_heading = last_heading % 360
+            last_interval = last_interval + random.gauss(0,interval_std)
+            if (last_interval<1):
+                last_interval = 1 
+            last_geo_point = point
+
+        return_val = {
+            "lon": point[0],
+            "lat": point[1]
+            
+        }
+        
+
+
     elif field_type == "ellipse":
 
         ellipse_maj_mean = 0.2 if len(split_f) < 3 else float(split_f[2])
@@ -280,9 +368,9 @@ def get_data_for_format(format,doc_num):
 
         chosen_city = random.choice(_cities_data)
         point = generate_random_point_normal(
-            float(chosen_city["lat"]), float(chosen_city["lng"]),sigma_degrees)
-        point1 = point[1]
-        point2 = point[0]
+            float(chosen_city["lng"]), float(chosen_city["lat"]),sigma_degrees)
+        point1 = point[0]
+        point2 = point[1]
         
         points = generate_random_ellipse(point1,point2,ellipse_maj_mean,ellipse_min_mean,ellipse_maj_std,ellipse_min_std,ellipse_num_points)
         return_val = {
@@ -362,7 +450,7 @@ def generate_random_doc(format,doc_num):
 
     return res
 
-def generate_random_point(lat_dd, lon_dd, min_radius_meters, max_radius_meters):
+def generate_random_point(lon_dd, lat_dd, min_radius_meters, max_radius_meters):
     """
     From https://jordinl.com/posts/2019-02-15-how-to-generate-random-geocoordinates-within-given-radius
     """
@@ -385,9 +473,9 @@ def generate_random_point(lat_dd, lon_dd, min_radius_meters, max_radius_meters):
     ans_lat_dd = (lat_rad + delta_lat) * (180.0 / math.pi)
     ans_lon_dd = (lon_rad + delta_lon) * (180.0 / math.pi)
 
-    return ans_lat_dd, ans_lon_dd
+    return ans_lon_dd, ans_lat_dd
 
-def generate_random_point_normal(lat_dd, lon_dd, sigma_degrees):
+def generate_random_point_normal(lon_dd, lat_dd, sigma_degrees):
 
     ans_lat_dd = lat_dd+random.gauss(0,sigma_degrees)/2
     ans_lon_dd = lon_dd+random.gauss(0,sigma_degrees)
@@ -447,6 +535,18 @@ def generate_random_path(x,y,length,heading_std,speed_start,speed_std):
         points.append([x1,y1])
         speed = speed + random.gauss(0,speed_std)
     return points
+
+def generate_next_geo_point(last_geo_point,last_heading,distance):
+
+    earth_circ = 6371000.0 * 2 * math.pi
+    x1 = last_geo_point[0]+ math.cos(math.radians(last_heading))*distance/earth_circ
+    y1 = last_geo_point[1]+ math.sin(math.radians(last_heading))*distance/earth_circ
+    if x1<-180: x1=-180
+    if x1>180: x1=180
+    if y1<-90: y1=-90
+    if y1>90: y1=90
+    return [x1,y1]
+
 
 def generate_mapping(format):
     properties = {}
