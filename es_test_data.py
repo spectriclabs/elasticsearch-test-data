@@ -151,6 +151,7 @@ def get_data_for_format(format,doc_num):
     field_type = split_f[1]
 
     return_val = ''
+    global _cities_data
 
     if field_type == "bool":
         return_val = random.choice([True, False])
@@ -260,7 +261,6 @@ def get_data_for_format(format,doc_num):
 
 
     elif field_type == "cities":
-        global _cities_data
         if not _cities_data:
             logging.error("cannot generate cities data without cities file, see README.md")
             exit(1)
@@ -295,7 +295,6 @@ def get_data_for_format(format,doc_num):
         global last_heading
         global last_interval
         global last_speed
-        global _cities_data
 
         if doc_num % path_length == 0: #First Item of a new path
             if not _cities_data:
@@ -360,7 +359,6 @@ def get_data_for_format(format,doc_num):
         ellipse_min_std  = .05 if len(split_f) < 6 else float(split_f[5])
         ellipse_num_points = 30 if len(split_f) < 7 else int(split_f[6])
 
-        global _cities_data
         if not _cities_data:
             logging.error("cannot generate cities data without cities file, see README.md")
             exit(1)
